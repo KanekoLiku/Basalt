@@ -1,0 +1,39 @@
+/*
+	Basalt Theme (Localization for JP)
+	[2025 Wikidot Theme]
+	Maintained by the JP SCP Wiki Technical Team, based on:
+
+	Basalt Theme
+	[2021 Wikidot Theme]
+	Created by the Basalt Team
+*/
+
+:root {
+	/* Header */
+	--header-title: 'SCP財団';
+	--header-subtitle: '確保 - 収容 - 保護';
+
+	/* Fonts */
+	--body-font-fallback: sans-serif;
+	--UI-font-fallback: sans-serif;
+	--mono-font-fallback: monospace;
+	--header-font-fallback: var(--body-font-fallback);
+}
+
+#header h1 a::after {
+	display: none;
+}
+
+:is(#page-content, #action-area) .page-rate-widget-box span {
+	height: inherit;
+}
+
+#page-content .rate-box-with-credit-button>.page-rate-widget-box {
+	display: contents;
+}
+
+@media (max-width: 767px) {
+	#top-bar .open-menu a {
+		bottom: unset;
+	}
+}

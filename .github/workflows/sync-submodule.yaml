@@ -1,0 +1,86 @@
+name: Sync submodule
+
+on:
+  schedule:
+    - cron: '0 0 * * 6'
+  workflow_dispatch:
+
+jobs:
+  sync-submodule:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+            fetch-depth: 0
+            submodules: true
+
+      - name: Set up Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Check for Sync PR
+        id: check_pr
+        run: |
+          PR_COUNT=$(gh pr list --search "Sync submodule:" --json number | jq length)
+          echo "PR_COUNT=$PR_COUNT" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Exit if PR exists
+        if: steps.check_pr.outputs.PR_COUNT > '0'
+        run: |
+          echo "Sync PR already exists. Closing the process."
+          exit 0
+
+      - name: Checkout new branch
+        if: steps.check_pr.outputs.PR_COUNT == '0'
+        run: |
+          BRANCH_NAME="sync/$(date +'%y%m%d-%H%M%S')"
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          git switch -c "$BRANCH_NAME" mega
+
+      - name: Update submodule
+        if: steps.check_pr.outputs.PR_COUNT == '0'
+        run: |
+          git submodule update --remote --merge
+
+      - name: Check for changes
+        if: steps.check_pr.outputs.PR_COUNT == '0'
+        id: check_changes
+        run: |
+          git diff --exit-code || echo "SUBMODULE_UPDATED=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push changes
+        if: steps.check_changes.outputs.SUBMODULE_UPDATED == 'true'
+        run: |
+          git add .
+          git commit -m "Sync submodule"
+          git push origin $BRANCH_NAME
+
+      - name: Get submodule commit message
+        if: steps.check_changes.outputs.SUBMODULE_UPDATED == 'true'
+        id: get_commit_message
+        run: |
+          SUBMODULE_PATH=$(git submodule | awk '{print $2}')
+          SUBMODULE_COMMIT_MESSAGE=$(git -C "$SUBMODULE_PATH" log -1 --pretty=%B)
+          echo "SUBMODULE_COMMIT_MESSAGE<<EOF" >> $GITHUB_OUTPUT
+          echo "$SUBMODULE_COMMIT_MESSAGE" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        if: steps.check_changes.outputs.SUBMODULE_UPDATED == 'true'
+        run: |
+          gh pr create \
+            --title "Sync submodule: $(date +'%y%m%d-%H%M%S')" \
+            --body $'This PR is a result of automatic synchronization.\n**Submodule commit message:**\n'"${{ steps.get_commit_message.outputs.SUBMODULE_COMMIT_MESSAGE }}" \
+            --base mega \
+            --head $BRANCH_NAME
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
